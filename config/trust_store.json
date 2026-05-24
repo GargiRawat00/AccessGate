@@ -4,12 +4,12 @@
     {
       "name": "curl",
       "path": "/usr/bin/curl",
-      "sha256": "TO_BE_ENROLLED"
+      "sha256": "ea43dc3e72aadac2d8820181a79af1ce94f0f713f7aef81f5ef0ed5881d1f5eb"
     },
     {
       "name": "chromium",
       "path": "/usr/bin/chromium",
-      "sha256": "TO_BE_ENROLLED"
+      "sha256": "ea43dc3e72aadac2d8820181a79af1ce94f0f713f7aef81f5ef0ed5881d1f5eb"
     }
   ]
 }

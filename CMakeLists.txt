@@ -13,6 +13,7 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 add_executable(accessgate-agent
     src/main.cpp
     src/PolicyEngine.cpp
+    src/TrustStore.cpp
 )
 
 target_include_directories(accessgate-agent
