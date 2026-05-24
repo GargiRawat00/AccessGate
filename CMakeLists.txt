@@ -15,6 +15,7 @@ add_executable(accessgate-agent
     src/PolicyEngine.cpp
     src/TrustStore.cpp
     src/ComplianceChecker.cpp
+    src/DecisionEngine.cpp
 )
 
 target_include_directories(accessgate-agent

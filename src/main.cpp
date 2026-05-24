@@ -5,66 +5,30 @@
 #include "PolicyEngine.hpp"
 #include "TrustStore.hpp"
 #include "ComplianceChecker.hpp"
+#include "DecisionEngine.hpp"
 
-std::string decisionToString(DecisionAction action) {
-    return action == DecisionAction::ALLOW ? "ALLOW" : "DENY";
-}
-
-void runDemoDecision(
-    const PolicyEngine& engine,
-    const std::string& app,
-    const std::string& destination,
-    const std::string& complianceStatus
-) {
-    AccessRequest request{
-        app,
-        destination,
-        complianceStatus
-    };
-
-    AccessDecision decision = engine.evaluate(request);
-
+void printFinalDecision(const FinalAccessDecision& decision) {
     nlohmann::json output = {
-        {"app", app},
-        {"destination", destination},
-        {"compliance_status", complianceStatus},
-        {"decision", decisionToString(decision.action)},
+        {"app", decision.app},
+        {"destination", decision.destination},
+        {"executable_path", decision.executablePath},
+        {"trust_status", decision.trustStatus},
+        {"compliance_status", decision.complianceStatus},
+        {"decision", decision.decision},
+        {"allowed", decision.allowed},
         {"reason", decision.reason},
         {"matched_rule_id", decision.matchedRuleId},
-        {"matched_rule", decision.matchedRule}
+        {"executable_hash", decision.executableHash}
     };
 
     std::cout << output.dump(4) << std::endl;
 }
 
-void runTrustStoreDemo(
-    const TrustStore& trustStore,
-    const std::string& appName,
-    const std::string& executablePath
-) {
-    TrustCheckResult result = trustStore.verifyApp(appName, executablePath);
-
-    nlohmann::json output = {
-        {"app", result.appName},
-        {"expected_path", result.expectedPath},
-        {"actual_path", result.actualPath},
-        {"expected_hash", result.expectedHash},
-        {"actual_hash", result.actualHash},
-        {"trust_status", TrustStore::statusToString(result.status)},
-        {"message", result.message}
-    };
-
-    std::cout << output.dump(4) << std::endl;
-}
-
-void runComplianceDemo(const ComplianceResult& complianceResult) {
-    std::string complianceStatus =
-        ComplianceChecker::statusToString(complianceResult.status);
-
+void printComplianceResult(const ComplianceResult& complianceResult) {
     nlohmann::json output = {
         {"device_id", complianceResult.deviceId},
         {"policy_version", complianceResult.policyVersion},
-        {"compliance_status", complianceStatus},
+        {"compliance_status", ComplianceChecker::statusToString(complianceResult.status)},
         {"message", complianceResult.message},
         {"failed_checks", complianceResult.failedChecks}
     };
@@ -76,7 +40,7 @@ int main() {
     nlohmann::json startup = {
         {"project", "AccessGate"},
         {"owner", "Gargi"},
-        {"module", "PolicyEngine + TrustStore + ComplianceChecker MVP"},
+        {"module", "DecisionEngine MVP"},
         {"status", "running"},
         {"goal", "per-app zero trust access control"}
     };
@@ -105,28 +69,49 @@ int main() {
     }
 
     ComplianceResult complianceResult = complianceChecker.evaluate();
-    std::string complianceStatus =
-        ComplianceChecker::statusToString(complianceResult.status);
 
-    std::cout << "\n--- ComplianceChecker Demo ---\n";
-    runComplianceDemo(complianceResult);
+    std::cout << "\n--- Compliance Status ---\n";
+    printComplianceResult(complianceResult);
 
-    std::cout << "\n--- Policy Demo 1: curl accessing public API using actual compliance status ---\n";
-    runDemoDecision(policyEngine, "curl", "public-api.local", complianceStatus);
+    DecisionEngine decisionEngine(policyEngine, trustStore);
 
-    std::cout << "\n--- Policy Demo 2: curl accessing internal API using actual compliance status ---\n";
-    runDemoDecision(policyEngine, "curl", "internal-api.local", complianceStatus);
+    std::cout << "\n--- Final Decision 1: trusted curl accessing public API ---\n";
+    FinalAccessDecision decision1 = decisionEngine.evaluate(
+        "curl",
+        "public-api.local",
+        "/usr/bin/curl",
+        complianceResult
+    );
+    printFinalDecision(decision1);
 
-    std::cout << "\n--- Policy Demo 3: chromium accessing HR portal while forced non-compliant ---\n";
-    runDemoDecision(policyEngine, "chromium", "hr-portal.local", "NON_COMPLIANT");
+    std::cout << "\n--- Final Decision 2: trusted curl accessing internal API ---\n";
+    FinalAccessDecision decision2 = decisionEngine.evaluate(
+        "curl",
+        "internal-api.local",
+        "/usr/bin/curl",
+        complianceResult
+    );
+    printFinalDecision(decision2);
 
-    std::cout << "\n--- TrustStore Demo 1: verify curl binary ---\n";
-    runTrustStoreDemo(trustStore, "curl", "/usr/bin/curl");
+    std::cout << "\n--- Final Decision 3: unknown app accessing public API ---\n";
+    FinalAccessDecision decision3 = decisionEngine.evaluate(
+        "unknown-app",
+        "public-api.local",
+        "/usr/bin/unknown-app",
+        complianceResult
+    );
+    printFinalDecision(decision3);
 
-    std::cout << "\n--- TrustStore Demo 2: unknown app ---\n";
-    runTrustStoreDemo(trustStore, "unknown-app", "/usr/bin/unknown-app");
+    std::cout << "\n--- Final Decision 4: curl with wrong executable path ---\n";
+    FinalAccessDecision decision4 = decisionEngine.evaluate(
+        "curl",
+        "public-api.local",
+        "/tmp/fake-curl",
+        complianceResult
+    );
+    printFinalDecision(decision4);
 
-    std::cout << "\nAccessGate ComplianceChecker demo completed." << std::endl;
+    std::cout << "\nAccessGate DecisionEngine demo completed." << std::endl;
 
     return 0;
 }
