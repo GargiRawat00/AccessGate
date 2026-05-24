@@ -6,6 +6,7 @@
 #include "TrustStore.hpp"
 #include "ComplianceChecker.hpp"
 #include "DecisionEngine.hpp"
+#include "SQLiteAuditStore.hpp"
 
 void printFinalDecision(const FinalAccessDecision& decision) {
     nlohmann::json output = {
@@ -36,11 +37,33 @@ void printComplianceResult(const ComplianceResult& complianceResult) {
     std::cout << output.dump(4) << std::endl;
 }
 
+void evaluateAndAudit(
+    const DecisionEngine& decisionEngine,
+    SQLiteAuditStore& auditStore,
+    const std::string& app,
+    const std::string& destination,
+    const std::string& executablePath,
+    const ComplianceResult& complianceResult
+) {
+    FinalAccessDecision decision = decisionEngine.evaluate(
+        app,
+        destination,
+        executablePath,
+        complianceResult
+    );
+
+    printFinalDecision(decision);
+
+    if (!auditStore.logDecision(decision)) {
+        std::cerr << "Failed to write decision to audit store." << std::endl;
+    }
+}
+
 int main() {
     nlohmann::json startup = {
         {"project", "AccessGate"},
         {"owner", "Gargi"},
-        {"module", "DecisionEngine MVP"},
+        {"module", "DecisionEngine + SQLiteAuditStore MVP"},
         {"status", "running"},
         {"goal", "per-app zero trust access control"}
     };
@@ -73,45 +96,63 @@ int main() {
     std::cout << "\n--- Compliance Status ---\n";
     printComplianceResult(complianceResult);
 
+    SQLiteAuditStore auditStore;
+
+    if (!auditStore.open("accessgate.db")) {
+        std::cerr << "AccessGate failed to start because audit DB open failed." << std::endl;
+        return 1;
+    }
+
+    if (!auditStore.initializeSchema()) {
+        std::cerr << "AccessGate failed to start because audit schema init failed." << std::endl;
+        return 1;
+    }
+
     DecisionEngine decisionEngine(policyEngine, trustStore);
 
     std::cout << "\n--- Final Decision 1: trusted curl accessing public API ---\n";
-    FinalAccessDecision decision1 = decisionEngine.evaluate(
+    evaluateAndAudit(
+        decisionEngine,
+        auditStore,
         "curl",
         "public-api.local",
         "/usr/bin/curl",
         complianceResult
     );
-    printFinalDecision(decision1);
 
     std::cout << "\n--- Final Decision 2: trusted curl accessing internal API ---\n";
-    FinalAccessDecision decision2 = decisionEngine.evaluate(
+    evaluateAndAudit(
+        decisionEngine,
+        auditStore,
         "curl",
         "internal-api.local",
         "/usr/bin/curl",
         complianceResult
     );
-    printFinalDecision(decision2);
 
     std::cout << "\n--- Final Decision 3: unknown app accessing public API ---\n";
-    FinalAccessDecision decision3 = decisionEngine.evaluate(
+    evaluateAndAudit(
+        decisionEngine,
+        auditStore,
         "unknown-app",
         "public-api.local",
         "/usr/bin/unknown-app",
         complianceResult
     );
-    printFinalDecision(decision3);
 
     std::cout << "\n--- Final Decision 4: curl with wrong executable path ---\n";
-    FinalAccessDecision decision4 = decisionEngine.evaluate(
+    evaluateAndAudit(
+        decisionEngine,
+        auditStore,
         "curl",
         "public-api.local",
         "/tmp/fake-curl",
         complianceResult
     );
-    printFinalDecision(decision4);
 
-    std::cout << "\nAccessGate DecisionEngine demo completed." << std::endl;
+    auditStore.printRecentDecisions(10);
+
+    std::cout << "\nAccessGate SQLiteAuditStore demo completed." << std::endl;
 
     return 0;
 }
