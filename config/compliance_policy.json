@@ -1,0 +1,11 @@
+{
+  "policy_version": "v1",
+  "device_id": "gargi-endpoint-01",
+  "compliance_status": "HEALTHY",
+  "checks": {
+    "firewall_enabled": true,
+    "agent_heartbeat_active": true,
+    "policy_version_current": true,
+    "critical_risk_detected": false
+  }
+}
