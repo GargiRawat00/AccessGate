@@ -1,0 +1,9 @@
+build/
+.vscode/
+.env
+*.db
+*.log
+*.o
+*.out
+__pycache__/
+.DS_Store

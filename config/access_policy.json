@@ -1,0 +1,27 @@
+{
+  "policy_version": "v1",
+  "default_action": "DENY",
+  "rules": [
+    {
+      "rule_id": "ALLOW_PUBLIC_API_FOR_CURL",
+      "app": "curl",
+      "destination": "public-api.local",
+      "action": "ALLOW",
+      "requires_compliance": false
+    },
+    {
+      "rule_id": "DENY_INTERNAL_API_FOR_CURL",
+      "app": "curl",
+      "destination": "internal-api.local",
+      "action": "DENY",
+      "reason": "CLI tools are not allowed to access internal API"
+    },
+    {
+      "rule_id": "ALLOW_HR_PORTAL_FOR_BROWSER_IF_COMPLIANT",
+      "app": "chromium",
+      "destination": "hr-portal.local",
+      "action": "ALLOW",
+      "requires_compliance": true
+    }
+  ]
+}

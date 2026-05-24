@@ -1,0 +1,15 @@
+{
+  "trust_store_version": "v1",
+  "trusted_apps": [
+    {
+      "name": "curl",
+      "path": "/usr/bin/curl",
+      "sha256": "TO_BE_ENROLLED"
+    },
+    {
+      "name": "chromium",
+      "path": "/usr/bin/chromium",
+      "sha256": "TO_BE_ENROLLED"
+    }
+  ]
+}
