@@ -20,3 +20,8 @@ accessgate_proxy.log
 # Editor / OS files
 .vscode/
 .DS_Store
+
+# Local demo/runtime artifacts
+accessgate.db
+accessgate_proxy.log
+build/
