@@ -7,6 +7,7 @@
 #include "ComplianceChecker.hpp"
 #include "DecisionEngine.hpp"
 #include "SQLiteAuditStore.hpp"
+#include "LocalProxy.hpp"
 
 void printFinalDecision(const FinalAccessDecision& decision) {
     nlohmann::json output = {
@@ -59,11 +60,14 @@ void evaluateAndAudit(
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    const bool proxyMode =
+        (argc > 1 && std::string(argv[1]) == "--proxy");
+
     nlohmann::json startup = {
         {"project", "AccessGate"},
         {"owner", "Gargi"},
-        {"module", "DecisionEngine + SQLiteAuditStore MVP"},
+        {"module", proxyMode ? "LocalProxy MVP" : "DecisionEngine + SQLiteAuditStore MVP"},
         {"status", "running"},
         {"goal", "per-app zero trust access control"}
     };
@@ -71,21 +75,18 @@ int main() {
     std::cout << startup.dump(4) << std::endl;
 
     PolicyEngine policyEngine;
-
     if (!policyEngine.loadFromFile("config/access_policy.json")) {
         std::cerr << "AccessGate failed to start because policy loading failed." << std::endl;
         return 1;
     }
 
     TrustStore trustStore;
-
     if (!trustStore.loadFromFile("config/trust_store.json")) {
         std::cerr << "AccessGate failed to start because trust store loading failed." << std::endl;
         return 1;
     }
 
     ComplianceChecker complianceChecker;
-
     if (!complianceChecker.loadFromFile("config/compliance_policy.json")) {
         std::cerr << "AccessGate failed to start because compliance policy loading failed." << std::endl;
         return 1;
@@ -97,7 +98,6 @@ int main() {
     printComplianceResult(complianceResult);
 
     SQLiteAuditStore auditStore;
-
     if (!auditStore.open("accessgate.db")) {
         std::cerr << "AccessGate failed to start because audit DB open failed." << std::endl;
         return 1;
@@ -109,6 +109,19 @@ int main() {
     }
 
     DecisionEngine decisionEngine(policyEngine, trustStore);
+
+    if (proxyMode) {
+        LocalProxy proxy(
+            "127.0.0.1",
+            8080,
+            decisionEngine,
+            auditStore,
+            complianceResult
+        );
+
+        proxy.run();
+        return 0;
+    }
 
     std::cout << "\n--- Final Decision 1: trusted curl accessing public API ---\n";
     evaluateAndAudit(
@@ -153,6 +166,5 @@ int main() {
     auditStore.printRecentDecisions(10);
 
     std::cout << "\nAccessGate SQLiteAuditStore demo completed." << std::endl;
-
     return 0;
 }
