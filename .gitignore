@@ -7,3 +7,16 @@ build/
 *.out
 __pycache__/
 .DS_Store
+
+# Build artifacts
+build/
+
+# Local runtime files
+accessgate.db
+accessgate_proxy.log
+*.db-shm
+*.db-wal
+
+# Editor / OS files
+.vscode/
+.DS_Store
