@@ -1,4 +1,4 @@
-name: C++ Build
+name: C++ Build and Demo
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-and-demo:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,10 +25,17 @@ jobs:
             libsqlite3-dev \
             libssl-dev \
             libboost-system-dev \
-            libboost-thread-dev
+            libboost-thread-dev \
+            sqlite3 \
+            curl \
+            psmisc \
+            python3
 
       - name: Configure
         run: cmake -S . -B build -G Ninja
 
       - name: Build
         run: cmake --build build
+
+      - name: Run AccessGate demo smoke test
+        run: ./scripts/demo.sh
