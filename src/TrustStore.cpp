@@ -7,7 +7,7 @@
 #include <stdexcept>
 
 #include <nlohmann/json.hpp>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 using json = nlohmann::json;
 
@@ -115,11 +115,19 @@ std::string TrustStore::computeSha256(const std::string& filePath) {
     std::ifstream file(filePath, std::ios::binary);
 
     if (!file.is_open()) {
-        throw std::runtime_error("Could not open executable file: " + filePath);
+        return "";
     }
 
-    SHA256_CTX sha256Context;
-    SHA256_Init(&sha256Context);
+    EVP_MD_CTX* context = EVP_MD_CTX_new();
+
+    if (context == nullptr) {
+        return "";
+    }
+
+    if (EVP_DigestInit_ex(context, EVP_sha256(), nullptr) != 1) {
+        EVP_MD_CTX_free(context);
+        return "";
+    }
 
     char buffer[8192];
 
@@ -128,27 +136,37 @@ std::string TrustStore::computeSha256(const std::string& filePath) {
         std::streamsize bytesRead = file.gcount();
 
         if (bytesRead > 0) {
-            SHA256_Update(
-                &sha256Context,
-                reinterpret_cast<unsigned char*>(buffer),
-                static_cast<size_t>(bytesRead)
-            );
+            if (EVP_DigestUpdate(
+                    context,
+                    buffer,
+                    static_cast<size_t>(bytesRead)
+                ) != 1) {
+                EVP_MD_CTX_free(context);
+                return "";
+            }
         }
     }
 
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_Final(hash, &sha256Context);
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hashLength = 0;
 
-    std::ostringstream result;
-
-    for (unsigned char byte : hash) {
-        result << std::hex
-               << std::setw(2)
-               << std::setfill('0')
-               << static_cast<int>(byte);
+    if (EVP_DigestFinal_ex(context, hash, &hashLength) != 1) {
+        EVP_MD_CTX_free(context);
+        return "";
     }
 
-    return result.str();
+    EVP_MD_CTX_free(context);
+
+    std::ostringstream oss;
+
+    for (unsigned int i = 0; i < hashLength; ++i) {
+        oss << std::hex
+            << std::setw(2)
+            << std::setfill('0')
+            << static_cast<int>(hash[i]);
+    }
+
+    return oss.str();
 }
 
 std::string TrustStore::statusToString(TrustStatus status) {
