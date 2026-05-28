@@ -18,6 +18,7 @@ add_executable(accessgate-agent
     src/DecisionEngine.cpp
     src/SQLiteAuditStore.cpp
     src/LocalProxy.cpp
+    src/ProcessIdentityResolver.cpp
 )
 
 target_include_directories(accessgate-agent

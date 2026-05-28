@@ -7,6 +7,7 @@
 #include "DecisionEngine.hpp"
 #include "SQLiteAuditStore.hpp"
 #include "ComplianceChecker.hpp"
+#include "ProcessIdentityResolver.hpp"
 
 class LocalProxy {
 public:
@@ -28,6 +29,8 @@ private:
     SQLiteAuditStore& auditStore_;
     const ComplianceResult& complianceResult_;
 
+    ProcessIdentityResolver identityResolver_;
+
     boost::asio::io_context ioContext_;
     boost::asio::ip::tcp::acceptor acceptor_;
 
@@ -40,6 +43,7 @@ private:
 
     static std::string extractHostHeader(const std::string& rawHeaders);
     static std::string trimCarriageReturn(const std::string& value);
+    static std::string basenameFromPath(const std::string& path);
 
     static std::string buildHttpResponse(
         int statusCode,

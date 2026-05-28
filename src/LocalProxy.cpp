@@ -38,8 +38,18 @@ void LocalProxy::run() {
 
 void LocalProxy::handleClient(tcp::socket socket) {
     try {
-        boost::asio::streambuf buffer;
+        const auto remoteEndpoint = socket.remote_endpoint();
+        const auto localEndpoint = socket.local_endpoint();
 
+        const std::string clientIp = remoteEndpoint.address().to_string();
+        const uint16_t clientPort =
+            static_cast<uint16_t>(remoteEndpoint.port());
+
+        const std::string serverIp = localEndpoint.address().to_string();
+        const uint16_t serverPort =
+            static_cast<uint16_t>(localEndpoint.port());
+
+        boost::asio::streambuf buffer;
         boost::asio::read_until(socket, buffer, "\r\n\r\n");
 
         std::istream requestStream(&buffer);
@@ -55,8 +65,9 @@ void LocalProxy::handleClient(tcp::socket socket) {
             headers << line << "\n";
         }
 
-        std::string rawHeaders = headers.str();
-        std::string hostHeader = extractHostHeader(rawHeaders);
+        const std::string rawHeaders = headers.str();
+        const std::string hostHeader = extractHostHeader(rawHeaders);
+
         std::string destination =
             extractDestinationFromRequest(requestLine, hostHeader);
 
@@ -64,20 +75,42 @@ void LocalProxy::handleClient(tcp::socket socket) {
             destination = "unknown-destination";
         }
 
+        ProcessIdentity identity = identityResolver_.resolveFromTcpConnection(
+            clientIp,
+            clientPort,
+            serverIp,
+            serverPort
+        );
+
+        std::string appName = identity.processName;
+        std::string executablePath = identity.executablePath;
+
+        if (!identity.found || executablePath.empty()) {
+            appName = "curl";
+            executablePath = "/usr/bin/curl";
+        }
+
+        if (appName.empty()) {
+            appName = basenameFromPath(executablePath);
+        }
+
         std::cout << "\n--- Incoming Proxy Request ---\n";
         std::cout << "request_line: " << requestLine << "\n";
         std::cout << "destination: " << destination << "\n";
+        std::cout << "client: " << clientIp << ":" << clientPort << "\n";
+        std::cout << "server: " << serverIp << ":" << serverPort << "\n";
+        std::cout << "identity_found: " << (identity.found ? "true" : "false") << "\n";
+        std::cout << "identity_source: " << identity.source << "\n";
+        std::cout << "identity_message: " << identity.message << "\n";
+        std::cout << "pid: " << identity.pid << "\n";
+        std::cout << "uid: " << identity.uid << "\n";
+        std::cout << "process: " << appName << "\n";
+        std::cout << "exe: " << executablePath << "\n";
 
-        /*
-         * MVP assumption:
-         * For this first proxy demo, the client is treated as curl.
-         * Later, ProcessIdentityResolver will replace this with real
-         * socket-to-PID mapping using /proc/net/tcp and /proc/<pid>/fd.
-         */
         FinalAccessDecision decision = decisionEngine_.evaluate(
-            "curl",
+            appName,
             destination,
-            "/usr/bin/curl",
+            executablePath,
             complianceResult_
         );
 
@@ -86,6 +119,11 @@ void LocalProxy::handleClient(tcp::socket socket) {
         nlohmann::json bodyJson = {
             {"project", "AccessGate"},
             {"mode", "local-proxy-mvp"},
+            {"identity_found", identity.found},
+            {"identity_source", identity.source},
+            {"identity_message", identity.message},
+            {"pid", identity.pid},
+            {"uid", identity.uid},
             {"app", decision.app},
             {"destination", decision.destination},
             {"decision", decision.decision},
@@ -182,6 +220,16 @@ std::string LocalProxy::trimCarriageReturn(const std::string& value) {
     }
 
     return value;
+}
+
+std::string LocalProxy::basenameFromPath(const std::string& path) {
+    std::size_t pos = path.find_last_of('/');
+
+    if (pos == std::string::npos) {
+        return path;
+    }
+
+    return path.substr(pos + 1);
 }
 
 std::string LocalProxy::buildHttpResponse(
