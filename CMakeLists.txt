@@ -35,3 +35,33 @@ target_link_libraries(accessgate-agent
     Boost::system
     Boost::thread
 )
+
+
+enable_testing()
+
+add_executable(accessgate-tests
+    tests/core_tests.cpp
+    src/PolicyEngine.cpp
+    src/TrustStore.cpp
+    src/ComplianceChecker.cpp
+    src/DecisionEngine.cpp
+)
+
+target_include_directories(accessgate-tests
+    PRIVATE
+    include
+)
+
+target_link_libraries(accessgate-tests
+    PRIVATE
+    nlohmann_json::nlohmann_json
+    OpenSSL::SSL
+    OpenSSL::Crypto
+)
+
+add_test(NAME AccessGateCoreTests COMMAND accessgate-tests)
+
+set_tests_properties(AccessGateCoreTests
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
